@@ -53,7 +53,7 @@ Giá phương tiện, ăn uống, vui chơi và phần lớn chỗ ở được 
 
 ## Kỹ thuật và kiểm tra
 
-- Bản Vercel: Next.js API và Upstash Redis REST. Trạng thái phòng tạm có TTL trượt 24 giờ, chỉ hoạt động trong lúc chơi rồi tự hết hạn; ghi có kiểm tra version để tránh mất lựa chọn khi nhiều điện thoại cập nhật cùng lúc.
+- Bản Vercel: Next.js API và Supabase Postgres qua Data REST API. Trạng thái phòng hết hạn sau 24 giờ từ thao tác cuối; Supabase Cron dọn phòng hết hạn mỗi 15 phút. API cập nhật có điều kiện version để tránh mất lựa chọn khi nhiều điện thoại ghi cùng lúc.
 - Bản Wi-Fi: cùng giao diện và cùng bộ luật, Node HTTP và SQLite trong RAM; trạng thái mất khi dừng máy chủ. Bản Wi-Fi không cần cài dependency sau khi đã dựng.
 - Vai DM và người chơi dùng khóa ngẫu nhiên. API lọc khóa của người khác và đáp án chưa công bố. Bảng tin chỉ được gửi đến client sau khi mở mốc.
 - Kiểm thử bộ luật ở `tests/game.test.mjs`. Kiểm thử HTTP trọn lượt ở `tests/http-smoke.mjs`.
@@ -62,4 +62,4 @@ Giá phương tiện, ăn uống, vui chơi và phần lớn chỗ ở được 
 
 Máy khác cần Node 22.13 trở lên. Dựng lại bản Wi-Fi bằng `node node_modules/vite/bin/vite.js build --config vite.local.config.ts`; chạy `node local/server.mjs`. Đặt `HOST=0.0.0.0` khi cần điện thoại truy cập. Mặc định server chỉ nghe loopback để kiểm tra trên máy.
 
-Để chạy bản Vercel cho khách bên ngoài Wi-Fi, kết nối Upstash Redis và đặt hai biến môi trường REST URL/token theo README. Bản Vercel tự hết hạn phòng sau 24 giờ không hoạt động; bản Wi-Fi xóa trạng thái khi dừng tiến trình.
+Để chạy bản Vercel cho khách bên ngoài Wi-Fi, tạo project Supabase, chạy `supabase/schema.sql`, rồi đặt `SUPABASE_URL` và `SUPABASE_SECRET_KEY` trong Vercel. Bản Wi-Fi xóa trạng thái khi dừng tiến trình.

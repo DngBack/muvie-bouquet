@@ -1,36 +1,43 @@
 import {createRoom,view,mutate,join,fail} from '../../../lib/engine.mjs';
 
 export const dynamic='force-dynamic';
-const ROOM_TTL_SECONDS=24*60*60;
+const ROOM_TTL_MS=24*60*60*1000;
 const json=(data:unknown,status=200)=>Response.json(data,{status,headers:{'Cache-Control':'no-store'}});
-const roomKey=(code:string)=>`muvie:room:${code}`;
 
-async function redisCommand<T>(...command:(string|number)[]):Promise<T>{
- const url=process.env.UPSTASH_REDIS_REST_URL,key=process.env.UPSTASH_REDIS_REST_TOKEN;
- if(!url||!key)throw new Error('Thiếu cấu hình kho phòng tạm. Hãy đặt UPSTASH_REDIS_REST_URL và UPSTASH_REDIS_REST_TOKEN.');
- const response=await fetch(url,{method:'POST',headers:{Authorization:`Bearer ${key}`,'Content-Type':'application/json'},body:JSON.stringify(command),cache:'no-store'});
- const result=await response.json();
- if(!response.ok||result.error)throw new Error(result.error||'Không thể kết nối kho phòng tạm.');
- return result.result as T;
+function supabaseConfig(){
+ const url=process.env.SUPABASE_URL;
+ const key=process.env.SUPABASE_SECRET_KEY||process.env.SUPABASE_SERVICE_ROLE_KEY;
+ if(!url||!key)throw new Error('Thiếu cấu hình Supabase. Hãy đặt SUPABASE_URL và SUPABASE_SECRET_KEY.');
+ const headers:Record<string,string>={apikey:key,'Content-Type':'application/json'};
+ // New sb_secret keys are API keys, not JWT bearer tokens. The legacy service_role key is a JWT.
+ if(!key.startsWith('sb_secret_'))headers.Authorization=`Bearer ${key}`;
+ return {url:`${url.replace(/\/$/,'')}/rest/v1/rooms`,headers};
 }
 
-async function loadRoom(code:string){
- const script="local v=redis.call('GET',KEYS[1]); if not v then return false end; local r=cjson.decode(v); if not r.closed then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return v";
- const raw=await redisCommand<string|null>('EVAL',script,1,roomKey(code),ROOM_TTL_SECONDS);
- return raw?JSON.parse(raw):null;
+async function roomsRequest<T>(path:string,init:RequestInit={}):Promise<T>{
+ const {url,headers}=supabaseConfig();
+ const response=await fetch(`${url}${path}`,{...init,headers:{...headers,...init.headers},cache:'no-store'});
+ const body=await response.text();
+ const result=body?JSON.parse(body):null;
+ if(!response.ok){
+  const error=new Error(result?.message||'Không thể truy cập Supabase.') as Error&{status?:number;code?:string};
+  error.status=response.status===409&&result?.code==='23505'?409:response.status;
+  error.code=result?.code;
+  throw error;
+ }
+ return result as T;
 }
 
-async function saveRoom(code:string,expectedVersion:number,room:any){
- const script="local v=redis.call('GET',KEYS[1]); if not v then return -1 end; local r=cjson.decode(v); if tonumber(r.version)~=tonumber(ARGV[1]) then return 0 end; redis.call('SET',KEYS[1],ARGV[2],'EX',ARGV[3]); return 1";
- return redisCommand<number>('EVAL',script,1,roomKey(code),expectedVersion,JSON.stringify(room),ROOM_TTL_SECONDS);
-}
+const expiry=()=>new Date(Date.now()+ROOM_TTL_MS).toISOString();
+const activeRoomFilter=(code:string)=>`code=eq.${encodeURIComponent(code)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}`;
 
 export async function GET(req:Request){try{
  const code=new URL(req.url).searchParams.get('code');
  if(!code)fail('Thiếu mã phòng.',400);
- const room=await loadRoom(code);
- if(!room)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
- return json(view(room,req.headers.get('Authorization')?.replace('Bearer ','')||''));
+ const rows=await roomsRequest<{data:any;version:number}[]>(`?select=data,version&${activeRoomFilter(code)}&limit=1`);
+ const row=rows[0];
+ if(!row)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
+ return json(view(row.data,req.headers.get('Authorization')?.replace('Bearer ','')||''));
 }catch(e:any){return json({error:e.message},e.status||500)}}
 
 export async function POST(req:Request){try{
@@ -39,21 +46,24 @@ export async function POST(req:Request){try{
  if(b.action==='create'){
   for(let i=0;i<8;i++){
    const a=new Uint32Array(1);crypto.getRandomValues(a);const code=String(10000000+a[0]%90000000),room=createRoom(code);
-   const created=await redisCommand<string|null>('SET',roomKey(code),JSON.stringify(room),'EX',ROOM_TTL_SECONDS,'NX');
-   if(created==='OK')return json({code,token:room.dm,room:view(room,room.dm)});
+   try{
+    await roomsRequest('',{method:'POST',headers:{Prefer:'return=minimal'},body:JSON.stringify({code,data:room,version:0,expires_at:expiry()})});
+    return json({code,token:room.dm,room:view(room,room.dm)});
+   }catch(error:any){if(error.code!=='23505')throw error;}
   }
   fail('Chưa tạo được phòng. Hãy thử lại.');
  }
  for(let i=0;i<8;i++){
   const code=String(b.code||'');
   if(!/^\d{8}$/.test(code))fail('Mã phòng cần gồm tám chữ số.');
-  const room=await loadRoom(code);
-  if(!room)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
-  const expectedVersion=room.version;let key=req.headers.get('Authorization')?.replace('Bearer ','')||'';
+  const filter=activeRoomFilter(code);
+  const rows=await roomsRequest<{data:any;version:number}[]>(`?select=data,version&${filter}&limit=1`);
+  const row=rows[0];
+  if(!row)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
+  const room=row.data;let key=req.headers.get('Authorization')?.replace('Bearer ','')||'';
   if(b.action==='join')key=join(room,b.role,b.name);else mutate(room,key,b.action,b.data);
-  const saved=await saveRoom(code,expectedVersion,room);
-  if(saved===1)return json({code:room.code,token:key,room:view(room,key)});
-  if(saved===-1)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
+  const updated=await roomsRequest<{code:string}[]>(`?${filter}&version=eq.${row.version}&select=code`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data:room,version:row.version+1,expires_at:expiry()})});
+  if(updated.length)return json({code:room.code,token:key,room:view(room,key)});
  }
  return json({error:'Phòng đang bận. Hãy thử lại.'},409);
 }catch(e:any){return json({error:e.message||'Không thể xử lý yêu cầu.'},e.status||500)}}

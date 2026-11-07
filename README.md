@@ -1,27 +1,35 @@
 # Muvie Mười Năm Tựa Một Bó Hoa
 
-Chạy `Bat-dau-Muvie.cmd` để dùng trong Wi-Fi quán.
+Ứng dụng web cho một DM và sáu người chơi. Có thể triển khai lên Vercel và mở bằng link trên máy tính hoặc điện thoại.
 
-Đọc [phân tích và hướng dẫn vận hành](PHAN-TICH-VA-HUONG-DAN.md). Mã nguồn gồm bản hosted và bản Wi-Fi Node/SQLite, dùng chung luật chơi.
+## Triển khai Vercel + Supabase
 
-Kiểm tra: `node --test tests/game.test.mjs`. Kiểm thử máy chủ: `node tests/http-smoke.mjs`.
+1. Tạo project Supabase.
+2. Mở **SQL Editor**, chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql). Script tạo bảng phòng, bật RLS và đặt lịch xóa phòng hết hạn mỗi 15 phút bằng Supabase Cron.
+3. Trong Supabase **Project Settings → API Keys**, sao chép Project URL và Secret key (`sb_secret_...`). Không dùng publishable key ở đây.
+4. Import `DngBack/muvie-bouquet` vào Vercel. Framework và lệnh build đã có trong `vercel.json`.
+5. Trong Vercel **Project Settings → Environment Variables**, thêm:
+   - `SUPABASE_URL`: Project URL.
+   - `SUPABASE_SECRET_KEY`: Secret key của Supabase.
+6. Deploy hoặc redeploy.
 
-## Deploy Vercel: phòng chỉ giữ tạm
+Secret key chỉ được gửi từ API server tới Supabase; không đặt trong mã trình duyệt, không thêm tiền tố `NEXT_PUBLIC_`, và không commit giá trị thật vào Git. Bảng `rooms` không có policy cho trình duyệt; API server là nơi duy nhất dùng key có quyền ghi.
 
-Mỗi phòng dùng Upstash Redis làm bộ nhớ tạm để DM và sáu người chơi đồng bộ qua nhiều điện thoại. Serverless Vercel không thể chia sẻ RAM của một tiến trình cho tất cả người chơi. Phòng tự hết hạn sau khi chơi xong; không cần tạo bảng hay cơ sở dữ liệu SQL.
+## Cách chơi
 
-1. Tạo database **Upstash Redis** từ [Upstash Console](https://console.upstash.com/) hoặc Vercel Marketplace.
-2. Lấy REST URL và REST token trong trang thông tin database.
-3. Import repo `DngBack/muvie-bouquet` vào Vercel. `vercel.json` đã chọn Next.js và lệnh build.
-4. Trong Vercel **Project Settings → Environment Variables**, thêm:
-   - `UPSTASH_REDIS_REST_URL`
-   - `UPSTASH_REDIS_REST_TOKEN`
-5. Deploy; không cần chạy migration hay tạo bảng.
+1. DM mở link Vercel, chọn **Tôi là DM** rồi tạo phòng.
+2. DM sao chép link mời có mã phòng và gửi vào nhóm chat.
+3. Sáu người mở link trên Safari/Chrome điện thoại, nhập tên và chọn đúng vai DM phân.
+4. DM dẫn trò chơi; các thiết bị đồng bộ tiến trình tự động. Không cài ứng dụng.
 
-Phòng tự hết hạn sau **24 giờ kể từ hoạt động cuối**. Các tab đang mở làm mới hạn khi đồng bộ. Reload cùng tab vẫn vào lại vai hiện tại; đóng tab thì không có file khôi phục.
+Phòng hết hạn sau 24 giờ kể từ thao tác chơi gần nhất. Supabase Cron xóa phòng hết hạn mỗi 15 phút. Reload cùng tab vẫn giữ vai hiện tại; đóng tab hoặc đăng xuất sẽ xóa vé của thiết bị đó. Sau khi kết thúc, người chơi có thể tải kỷ niệm HTML/PDF trước khi phòng bị xóa.
 
-## Chơi trên điện thoại
+## Chạy tại quán qua Wi-Fi
 
-DM tạo phòng rồi gửi link `...?phong=12345678` cho người chơi. Mỗi người mở link bằng Safari/Chrome, nhập tên và chọn vai được DM phân. Giao diện có thanh điều hướng dưới màn hình, vùng chạm rộng, chữ và nút dễ đọc hơn, bàn phím số cho mã phòng, cùng khoảng an toàn quanh tai thỏ/thanh home.
+Chạy `Bat-dau-Muvie.cmd`, giữ cửa sổ server mở, rồi cho điện thoại truy cập địa chỉ LAN mà server in ra. Bản Wi-Fi giữ trạng thái trong RAM và xóa khi dừng server.
 
-Upstash REST API nhận Redis command qua POST và hỗ trợ script Lua cho ghi có kiểm tra phiên bản; cách này dùng để đồng bộ trạng thái giữa các Vercel function instance. [Upstash REST API](https://upstash.com/docs/redis/features/restapi)
+## Tài liệu dự án
+
+- [Phân tích và hướng dẫn vận hành](PHAN-TICH-VA-HUONG-DAN.md)
+- Kiểm tra luật: `node --test tests/game.test.mjs`
+- Kiểm thử HTTP: `node tests/http-smoke.mjs`
