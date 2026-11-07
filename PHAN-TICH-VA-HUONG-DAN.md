@@ -5,12 +5,12 @@
 ## Mở app tại quán
 
 1. Chạy `Bat-dau-Muvie.cmd` trong thư mục này. Máy hiện tại đã có bản dựng và Node đi kèm trong `.work_dm/node-fast` ở thư mục cha.
-2. Giữ cửa sổ máy chủ mở. DM vào `http://localhost:4173`, chọn **Tôi là DM**, tạo phòng và lưu vé khôi phục.
+2. Giữ cửa sổ máy chủ mở suốt lượt chơi. DM vào `http://localhost:4173`, chọn **Tôi là DM** và tạo phòng.
 3. Sáu điện thoại cùng Wi-Fi truy cập địa chỉ `http://<IP máy tính>:4173` được cửa sổ máy chủ in ra. Không nhập `localhost` trên điện thoại. Chọn nhân vật đúng phân vai của DM và nhập mã tám chữ số.
 4. Nếu điện thoại không vào được, kiểm tra Wi-Fi có chặn các thiết bị liên lạc với nhau hay không và Windows Firewall có cho ứng dụng Node nhận kết nối trên mạng riêng hay chưa. Chưa thay đổi cấu hình tường lửa tự động.
-5. Mỗi người lưu vé phòng để lấy lại đúng vai nếu đóng tab. Vé DM có quyền điều khiển phòng, chỉ giữ cho DM. Rời giao diện không đóng phòng. **Đóng máy** ngừng nhận bài và lựa chọn mới.
+5. Không đóng tab của mình trong lúc chơi. Tải lại trang cùng tab sẽ khôi phục vai; đăng xuất hoặc đóng tab sẽ mất khóa vào vai đó. **Đóng máy** ngừng nhận bài và lựa chọn mới.
 
-Ứng dụng trong Wi-Fi quán không cần tài khoản ChatGPT. Dữ liệu lưu ở `data/muvie.sqlite`; dừng máy chủ trước khi sao lưu cả thư mục `data`. Đừng xóa dữ liệu giữa buổi chơi. Mỗi lần chạy lại tạo phòng mới, không dùng phòng đã đóng cho bàn khác.
+Ứng dụng trong Wi-Fi quán không cần tài khoản ChatGPT. Trạng thái ở SQLite trong bộ nhớ RAM và mất khi dừng máy chủ; lần chạy tiếp theo tạo phòng mới. Không cần migration hay sao lưu database.
 
 ## Các mốc đối chiếu kịch bản
 
@@ -53,13 +53,13 @@ Giá phương tiện, ăn uống, vui chơi và phần lớn chỗ ở được 
 
 ## Kỹ thuật và kiểm tra
 
-- Bản hosted: React/Vinext, API server, Cloudflare D1. JSON phòng cập nhật với điều kiện version và thử lại khi có ghi đồng thời, tránh mất lựa chọn của người khác.
-- Bản Wi-Fi: cùng giao diện và cùng bộ luật, Node HTTP và SQLite; dữ liệu lưu qua lần tắt/mở máy chủ. Bản Wi-Fi không cần cài dependency sau khi đã dựng.
+- Bản Vercel: Next.js API và Upstash Redis REST. Trạng thái phòng tạm có TTL trượt 24 giờ, chỉ hoạt động trong lúc chơi rồi tự hết hạn; ghi có kiểm tra version để tránh mất lựa chọn khi nhiều điện thoại cập nhật cùng lúc.
+- Bản Wi-Fi: cùng giao diện và cùng bộ luật, Node HTTP và SQLite trong RAM; trạng thái mất khi dừng máy chủ. Bản Wi-Fi không cần cài dependency sau khi đã dựng.
 - Vai DM và người chơi dùng khóa ngẫu nhiên. API lọc khóa của người khác và đáp án chưa công bố. Bảng tin chỉ được gửi đến client sau khi mở mốc.
 - Kiểm thử bộ luật ở `tests/game.test.mjs`. Kiểm thử HTTP trọn lượt ở `tests/http-smoke.mjs`.
-- Mã nguồn giao diện: `app/page.tsx`, `app/globals.css`. Luật: `lib/engine.mjs`. Nội dung: `lib/game-data.mjs`, `lib/story.mjs`.
+- Mã nguồn giao diện: `app/page.tsx`, `app/globals.css`, `app/mobile.css`. Luật: `lib/engine.mjs`. Nội dung: `lib/game-data.mjs`, `lib/story.mjs`.
 - Thay màu chính ở biến `:root` trong `app/globals.css`.
 
 Máy khác cần Node 22.13 trở lên. Dựng lại bản Wi-Fi bằng `node node_modules/vite/bin/vite.js build --config vite.local.config.ts`; chạy `node local/server.mjs`. Đặt `HOST=0.0.0.0` khi cần điện thoại truy cập. Mặc định server chỉ nghe loopback để kiểm tra trên máy.
 
-Bản hosted mới được tạo ở chế độ riêng tư theo mặc định Sites, nên không dùng đường link riêng tư đó để mời sáu khách chưa được cấp quyền. Bản Wi-Fi là đường dùng tại quán không phụ thuộc quyền truy cập Sites. Không tự đổi quyền hosted sang công khai vì nguồn chứa nội dung kịch bản.
+Để chạy bản Vercel cho khách bên ngoài Wi-Fi, kết nối Upstash Redis và đặt hai biến môi trường REST URL/token theo README. Bản Vercel tự hết hạn phòng sau 24 giờ không hoạt động; bản Wi-Fi xóa trạng thái khi dừng tiến trình.
