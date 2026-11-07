@@ -24,6 +24,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
+      <head>
+        <link rel="stylesheet" href="/fonts/fonts.css" />
+      </head>
       <body className="antialiased">{children}</body>
     </html>
   );
