@@ -33,7 +33,7 @@ const activeRoomFilter=(code:string)=>`code=eq.${encodeURIComponent(code)}&expir
 
 export async function GET(req:Request){try{
  const code=new URL(req.url).searchParams.get('code');
- if(!code)fail('Thiếu mã phòng.',400);
+ if(code===null)return json({error:'Thiếu mã phòng.'},400);
  const rows=await roomsRequest<{data:any;version:number}[]>(`?select=data,version&${activeRoomFilter(code)}&limit=1`);
  const row=rows[0];
  if(!row)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
