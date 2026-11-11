@@ -50,6 +50,9 @@
   .audio-track b, .audio-player > b { font-size: 13px; }
   .audio-track small { font-size: 11px; }
   .file-button { min-height: 46px; font-size: 12px; }
+  .photo-actions { display: grid; grid-template-columns: 1fr; gap: 10px; width: 100%; }
+  .photo-actions .file-button { width: 100%; min-height: 50px; justify-content: center; font-size: 14px; }
+  .photo-actions .fine { margin: 0; }
   .modal { width: min(100% - 28px, 480px); padding: 26px 22px; }
   .modal p { font-size: 14px; }
   .alert { bottom: calc(92px + env(safe-area-inset-bottom)); font-size: 13px; }
