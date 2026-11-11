@@ -1,4 +1,4 @@
-import {createRoom,view,mutate,join,fail} from '../../../lib/engine.mjs';
+import {createRoom,view,mutate,join,fail,upgradePairings} from '../../../lib/engine.mjs';
 
 export const dynamic='force-dynamic';
 const ROOM_TTL_MS=24*60*60*1000;
@@ -37,6 +37,7 @@ export async function GET(req:Request){try{
  const rows=await roomsRequest<{data:any;version:number}[]>(`?select=data,version&${activeRoomFilter(code)}&limit=1`);
  const row=rows[0];
  if(!row)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
+ upgradePairings(row.data);
  return json(view(row.data,req.headers.get('Authorization')?.replace('Bearer ','')||''));
 }catch(e:any){return json({error:e.message},e.status||500)}}
 
@@ -60,7 +61,7 @@ export async function POST(req:Request){try{
   const rows=await roomsRequest<{data:any;version:number}[]>(`?select=data,version&${filter}&limit=1`);
   const row=rows[0];
   if(!row)fail('Phòng đã hết hạn hoặc không còn hoạt động. Hãy nhờ DM tạo phòng mới.',404);
-  const room=row.data;let key=req.headers.get('Authorization')?.replace('Bearer ','')||'';
+  const room=row.data;upgradePairings(room);let key=req.headers.get('Authorization')?.replace('Bearer ','')||'';
   if(b.action==='join')key=join(room,b.role,b.name);else mutate(room,key,b.action,b.data);
   const updated=await roomsRequest<{code:string}[]>(`?${filter}&version=eq.${row.version}&select=code`,{method:'PATCH',headers:{Prefer:'return=representation'},body:JSON.stringify({data:room,version:row.version+1,expires_at:expiry()})});
   if(updated.length)return json({code:room.code,token:key,room:view(room,key)});
