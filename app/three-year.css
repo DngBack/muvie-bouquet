@@ -1,4 +1,5 @@
 .three-year-replay{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 18px;margin-bottom:18px;background:#f0e5d6;border:1px solid #dfcbb2}
+.post-shortfall-alert{margin-top:10px;padding:10px 12px;background:#fff2d8;border-left:3px solid #c58a3a;color:#78572e;font-size:10px;line-height:1.7}
 .three-year-replay>span{font-size:9px;letter-spacing:1.2px;color:#947858}
 .three-year-replay .outline{min-height:36px;padding:8px 12px;font-size:9px}
 .three-year-backdrop{position:fixed;inset:0;z-index:100;background:#251b18dc;display:grid;place-items:center;padding:18px}
